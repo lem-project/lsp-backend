@@ -344,6 +344,10 @@ form suitable for testing with #+."
   "Create a listening TCP socket on interface HOST and port PORT.
 BACKLOG queue length for incoming connections.")
 
+(definterface create-local-socket (socket-path &key backlog)
+  "Create a listening local (currently: UNIX domain) socket at SOCKET-PATH.
+BACKLOG queue length for incomming connections.")
+
 (definterface local-port (socket)
   "Return the local port number of SOCKET.")
 

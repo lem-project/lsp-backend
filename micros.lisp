@@ -704,9 +704,9 @@ If PACKAGE is not specified, the home package of SYMBOL is used."
                                     (dont-close *dont-close*))
   "Start the server and write the listen port number to PORT-FILE.
 This is the entry point for Emacs."
-  (setup-server 0
+  (setup-server (lambda () (socket-quest 0 nil))
                 (lambda (port) (announce-server-port port-file port))
-                style dont-close nil))
+                style dont-close))
 
 (defun create-server (&key (port default-server-port)
                         (style *communication-style*)
@@ -721,8 +721,22 @@ Optionally, an INTERFACE could be specified and swank will bind
 the PORT on this interface. By default, interface is \"localhost\"."
   (let ((*loopback-interface* (or interface
                                   *loopback-interface*)))
-    (setup-server port #'simple-announce-function
-                  style dont-close backlog)))
+    (setup-server (lambda () (socket-quest port backlog))
+                  #'simple-announce-function
+                  style dont-close)))
+
+#+(and unix sbcl)
+(defun create-server-unix (&key (socket-path "/tmp/micros.sock")
+                                (style *communication-style*)
+                                (dont-close *dont-close*)
+                                backlog)
+  "Start a SWANK server on the UNIX socket at SOCKET-PATH running in STYLE.
+If DONT-CLOSE is true then the listen socket will accept multiple
+connections, otherwise it will be closed after the first."
+  (setup-server
+   (lambda () (create-local-socket socket-path :backlog backlog))
+   #'simple-announce-function
+   style dont-close))
 
 (defun find-external-format-or-lose (coding-system)
   (or (find-external-format coding-system)
@@ -746,9 +760,9 @@ e.g.: (restart-loop (http-request url) (use-value (new) (setq url new)))"
         (ignore-errors (list (parse-integer (read-line *query-io*)))))
       (setq port new-port))))
 
-(defun setup-server (port announce-fn style dont-close backlog)
+(defun setup-server (socket-provider-fn announce-fn style dont-close)
   (init-log-output)
-  (let* ((socket (socket-quest port backlog))
+  (let* ((socket (funcall socket-provider-fn))
          (port (local-port socket)))
     (funcall announce-fn port)
     (labels ((serve () (accept-connections socket style dont-close))
